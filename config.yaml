@@ -1,0 +1,73 @@
+# Configuration file for QR Code Phishing Detection Project
+
+data:
+  # Paths to data directories
+  benign_dir: "data/QR_All_benign/QR_All_benign/qrs"
+  malicious_dir: "data/QR_All_benign/QR_All_Malicious/qrs"
+  
+  # Option A: Sampling strategy (recommended for CPU)
+  sample_size: 20000  # Number of images to sample per class (increased from 5000 for better learning)
+  # Available: ~430K benign, ~576K malicious
+  # Using 20K per class = 40K total (still manageable on CPU, ~4-6 hours training)
+  
+  # Data split ratios
+  train_ratio: 0.7
+  val_ratio: 0.15
+  test_ratio: 0.15
+  
+  # Image preprocessing
+  image_size: 224  # Target image size (128, 224, or 256)
+  
+  # Random seed for reproducibility
+  seed: 42
+
+training:
+  # Training hyperparameters
+  batch_size: 32  # Adjust based on memory (16, 32, or 64)
+  epochs: 10  # Number of training epochs
+  learning_rate: 0.0001  # Initial learning rate (further reduced for stability)
+  
+  # Optimizer settings (AdamW)
+  optimizer: "adamw"  # adamw or adam
+  weight_decay: 0.001  # L2 regularization (reduced from 0.01)
+  
+  # Learning rate scheduler
+  scheduler: "reduce_on_plateau"  # reduce_on_plateau or step
+  scheduler_patience: 5  # For reduce_on_plateau (increased from 3)
+  scheduler_factor: 0.5  # Factor to reduce LR
+  
+  # Gradient clipping (prevents exploding gradients)
+  gradient_clip: 1.0  # Clip gradients at this value
+  
+  # DataLoader settings
+  num_workers: 4  # Number of worker processes (match CPU cores)
+  pin_memory: false  # Set to true if using GPU
+  
+  # Model saving
+  save_dir: "models"
+  save_best: true  # Save model with best validation loss
+
+model:
+  # Model architecture (will be defined in model.py)
+  num_classes: 2  # Benign (0) and Malicious (1)
+  dropout: 0.5  # Dropout probability
+  
+  # Model saving
+  model_name: "qr_cnn_model"
+  save_path: "best_model.pth"  # Will be saved in save_dir/models/
+
+evaluation:
+  # Evaluation metrics
+  metrics: ["accuracy", "precision", "recall", "f1", "confusion_matrix"]
+  
+  # Efficiency metrics
+  measure_inference_time: true
+  inference_batch_size: 32
+
+logging:
+  # Experiment tracking
+  use_wandb: true  # Set to true to use Weights & Biases
+  wandb_project: "qr-phishing-detection"
+  wandb_entity: null  # Your wandb username (if using)
+  wandb_api_key: null  # Optional: Your API key (or use 'wandb login' command instead)
+
