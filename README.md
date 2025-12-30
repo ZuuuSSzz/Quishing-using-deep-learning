@@ -28,7 +28,7 @@ This project implements a binary classification system to distinguish between **
 
 1. **Clone or navigate to the project directory:**
    ```bash
-   cd /home/zuss/pytorch/quishing-with-ml
+   cd /home/user/quishing-with-ml
    ```
 
 2. **Install dependencies:**
