@@ -1,19 +1,21 @@
 # QR Code Phishing Detection using Deep Learning
 
-A PyTorch-based deep learning project for detecting phishing attempts in QR codes using Convolutional Neural Networks (CNN).
+A PyTorch-based deep learning project for detecting phishing attempts in QR codes using Convolutional Neural Networks (CNN) and Transfer Learning.
 
 ## 📋 Project Overview
 
-This project implements a binary classification system to distinguish between **benign** and **malicious** QR codes. The model uses a custom CNN architecture trained on a large dataset of QR code images.
+This project implements a binary classification system to distinguish between **benign** and **malicious** QR codes. The system supports both **custom CNN architecture** and **transfer learning** with pre-trained models (ResNet, EfficientNet, MobileNet).
 
 ### Key Features
 
-- **Custom CNN Architecture**: 3 convolutional layers + 2 fully connected layers
+- **Dual Model Support**: Custom CNN or Transfer Learning (ResNet, EfficientNet, MobileNet)
+- **Transfer Learning**: Pre-trained ResNet18 achieving **78.34% validation accuracy**
 - **Data Augmentation**: Random flips, rotations, and color jittering
 - **Experiment Tracking**: Integrated with Weights & Biases (wandb)
 - **Comprehensive Evaluation**: Accuracy, Precision, Recall, F1-Score, Confusion Matrix
-- **Efficiency Metrics**: Inference time and throughput measurements
+- **Efficiency Metrics**: Inference time, throughput, FLOPS, memory usage, model size
 - **Modular Design**: Separate modules for dataset, model, training, and evaluation
+- **GPU Optimized**: Supports CUDA for faster training
 
 ## 🚀 Quick Start
 
@@ -38,11 +40,19 @@ This project implements a binary classification system to distinguish between **
    ```bash
    uv run wandb login
    ```
-   Or add your API key to `config.yaml` under `logging.wandb_api_key`.
+   This will use your currently logged-in account. No need to hardcode API keys!
 
-### Dataset Structure
+### Dataset
 
-The project expects the following directory structure:
+**The dataset is not included in this repository due to size (~4GB).**
+
+#### Download Dataset
+
+Download the dataset from one of the following sources:
+
+- **CIC-Trap4Phish 2025 Dataset**: [Download from UNB CIC](https://www.unb.ca/cic/datasets/trap4phish2025.html)
+
+**Or use your own dataset** by placing QR code images in the following structure:
 
 ```
 data/
@@ -54,7 +64,7 @@ data/
         └── qrs/          # Malicious QR code images
 ```
 
-**Note:** The dataset paths can be configured in `config.yaml`.
+**Note:** The dataset paths can be configured in `config.yaml`
 
 ## 📖 Usage
 
@@ -64,16 +74,20 @@ Edit `config.yaml` to adjust hyperparameters:
 
 ```yaml
 data:
-  sample_size: 20000      # Images per class (None = use all)
+  sample_size: 100000     # Images per class (100K = 200K total)
   train_ratio: 0.7
   val_ratio: 0.15
   test_ratio: 0.15
 
+model:
+  model_type: "transfer"  # "cnn" or "transfer"
+  model_name: "resnet18"  # Pre-trained model name
+
 training:
   epochs: 10
-  batch_size: 32
-  learning_rate: 0.0001
-  weight_decay: 0.001
+  batch_size: 64          # Optimized for GPU
+  learning_rate: 0.00001
+  weight_decay: 0.0005
 ```
 
 ### 2. Training
@@ -88,6 +102,25 @@ uv run python train.py
 uv run jupyter notebook notebook.ipynb
 ```
 Then run all cells sequentially.
+
+### 2.1 Switching Between Models
+
+**Use Custom CNN:**
+```yaml
+# config.yaml
+model:
+  model_type: "cnn"
+```
+
+**Use Transfer Learning (Recommended):**
+```yaml
+# config.yaml
+model:
+  model_type: "transfer"
+  model_name: "resnet18"  # or "resnet34", "efficientnet_b0", etc.
+```
+
+No code changes needed - just modify `config.yaml` and run training!
 
 ### 3. Evaluation
 
@@ -109,41 +142,64 @@ quishing-with-ml/
 ├── config.yaml              # Configuration file
 ├── dataset.py               # Custom Dataset class
 ├── data_utils.py            # Data splitting and loading utilities
-├── model.py                 # CNN model architecture
+├── model.py                 # Model architecture (CNN + Transfer Learning)
 ├── train.py                 # Training script
 ├── test.py                  # Evaluation script
-├── notebook.ipynb           # Jupyter notebook (main deliverable)
+├── main.py                  # Entry point
 ├── README.md                # This file
 ├── REPORT.md                # Project report
+├── COMPARISON.md            # CNN vs Transfer Learning comparison
+├── ASSIGNMENT_CHECKLIST.md  # Assignment requirements checklist
 ├── pyproject.toml           # Dependencies
 └── models/                  # Saved models (created after training)
-    └── best_model.pth
+    ├── best_model.pth
+    └── training_history.png
 ```
 
 ## 🏗️ Model Architecture
 
-The CNN architecture consists of:
+The project supports two model architectures:
 
+### Option 1: Custom CNN (Default)
 - **Convolutional Layers**: 3 blocks (32 → 64 → 128 channels)
 - **Pooling**: MaxPool2d after each conv block
 - **Fully Connected**: 512 → 256 → 2 (output classes)
-- **Dropout**: 0.5 for regularization
+- **Dropout**: 0.3 for regularization
 - **Activation**: ReLU (except output layer)
+- **Total Parameters**: ~2.5M
+- **Model Size**: ~10 MB
 
-**Total Parameters**: ~2.5M  
-**Model Size**: ~10 MB
+### Option 2: Transfer Learning (Recommended) ⭐
+- **Pre-trained Models**: ResNet18, ResNet34, ResNet50, EfficientNet, MobileNet
+- **Currently Used**: ResNet18
+- **Total Parameters**: ~11.2M (ResNet18)
+- **Model Size**: ~42.7 MB (ResNet18)
+- **Performance**: 78.34% validation accuracy
+- **Training Time**: 25.15 minutes (10 epochs, 200K images, GPU)
+
+**Switch between models** by changing `model_type` in `config.yaml`:
+- `model_type: "cnn"` - Use custom CNN
+- `model_type: "transfer"` - Use pre-trained model
 
 ## 📊 Evaluation Metrics
 
 The model is evaluated using:
 
+### Classification Metrics
 - **Accuracy**: Overall classification accuracy
 - **Precision**: True positives / (True positives + False positives)
 - **Recall**: True positives / (True positives + False negatives)
 - **F1-Score**: Harmonic mean of precision and recall
 - **Confusion Matrix**: Detailed per-class performance
-- **Inference Time**: Average time per sample
+
+### Efficiency Metrics
+- **Inference Time**: Average time per sample (ms)
 - **Throughput**: Samples processed per second
+- **Model Size**: Disk storage (MB)
+- **Parameters**: Total trainable parameters
+- **FLOPs**: Floating Point Operations (computational complexity)
+- **Memory Usage**: Runtime memory consumption (GPU/CPU)
+- **Training Time**: Total training duration
 
 ## 🔧 Configuration Options
 
@@ -166,6 +222,9 @@ The model is evaluated using:
 
 ### Model Configuration
 
+- `model_type`: Model type - `"cnn"` (custom) or `"transfer"` (pre-trained)
+- `model_name`: Pre-trained model name (if using transfer learning)
+  - Options: `"resnet18"`, `"resnet34"`, `"resnet50"`, `"efficientnet_b0"`, `"efficientnet_b1"`, `"mobilenet_v3_small"`, `"mobilenet_v3_large"`
 - `num_classes`: Number of output classes (2 for binary)
 - `dropout`: Dropout probability
 
@@ -173,17 +232,17 @@ The model is evaluated using:
 
 - `use_wandb`: Enable/disable Weights & Biases tracking
 - `wandb_project`: WandB project name
-- `wandb_entity`: WandB entity/username
-- `wandb_api_key`: WandB API key (optional, can use `wandb login`)
+- `wandb_entity`: WandB entity/username (optional, can use `WANDB_ENTITY` env var)
 
 ## 📈 Weights & Biases Integration
 
 The project integrates with Weights & Biases for experiment tracking:
 
-1. **Login** (if not using API key in config):
+1. **Login to wandb**:
    ```bash
    uv run wandb login
    ```
+   This will use your currently logged-in account. No API keys need to be hardcoded!
 
 2. **Enable in config**:
    ```yaml
@@ -192,7 +251,26 @@ The project integrates with Weights & Biases for experiment tracking:
      wandb_project: "qr-phishing-detection"
    ```
 
-3. **View results**: Training metrics are automatically logged to your WandB dashboard.
+3. **Switch accounts without modifying code** (recommended):
+   - **Method 1**: Use `wandb login` to switch accounts
+     ```bash
+     uv run wandb login --relogin
+     ```
+   
+   - **Method 2**: Use environment variables (for temporary switching)
+     ```bash
+     export WANDB_ENTITY="your-entity-name"
+     export WANDB_API_KEY="your-api-key"  # Optional if already logged in
+     export WANDB_PROJECT="your-project"   # Optional, overrides config
+     ```
+   
+   - **Method 3**: Set entity in config.yaml (permanent)
+     ```yaml
+     logging:
+       wandb_entity: "your-entity-name"
+     ```
+
+4. **View results**: Training metrics are automatically logged to your WandB dashboard.
 
 ## 🧪 Testing Individual Components
 
@@ -231,15 +309,18 @@ uv run python testing/test_train_quick.py
 
 ### Performance Tips
 
-- **CPU Training**: Use smaller `sample_size` (e.g., 5000-10000 per class)
-- **GPU Training**: Increase `batch_size` to 64 or 128
+- **CPU Training**: Use smaller `sample_size` (e.g., 5000-10000 per class), `batch_size: 32`
+- **GPU Training**: Increase `batch_size` to 64 or 128, use larger `sample_size` (100K+)
 - **Faster Iteration**: Reduce `epochs` for testing
+- **Transfer Learning**: Faster convergence - fewer epochs needed (5-8 vs 10+)
+- **Memory Issues**: Reduce `batch_size` if GPU runs out of memory
 
 ## 📚 Dependencies
 
 All dependencies are listed in `pyproject.toml`:
 
 - `torch`, `torchvision`, `torchaudio`: PyTorch ecosystem
+- `timm`: Pre-trained models for transfer learning
 - `pandas`, `numpy`: Data manipulation
 - `matplotlib`, `seaborn`: Visualization
 - `scikit-learn`: Metrics
@@ -264,5 +345,24 @@ Created as part of the Deep Learning with PyTorch workshop assignment.
 
 ---
 
-**Note**: This project is designed for educational purposes. For production use, consider additional improvements such as transfer learning, ensemble methods, or hybrid approaches combining visual and URL features.
+## 🎯 Current Results
 
+**Transfer Learning (ResNet18) Performance:**
+- ✅ **Validation Accuracy**: 78.34%
+- ✅ **Training Time**: 25.15 minutes (10 epochs, 200K images, GPU)
+- ✅ **Model**: ResNet18 (11.2M parameters, 42.7 MB)
+- ✅ **Dataset**: 200,000 images (100K per class)
+
+**To get complete metrics**, run:
+```bash
+uv run python test.py
+```
+
+This will output:
+- Test set accuracy, precision, recall, F1-score
+- Confusion matrix
+- Efficiency metrics (FLOPS, memory usage, inference time)
+
+---
+
+**Note**: This project supports both custom CNN and transfer learning. Transfer learning (ResNet18) is currently configured and showing excellent results. For production use, consider ensemble methods or hybrid approaches combining visual and URL features.
