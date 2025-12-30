@@ -161,7 +161,9 @@ def train(
     model = create_model(
         num_classes=config['model']['num_classes'],
         dropout=config['model']['dropout'],
-        device=device
+        device=device,
+        model_type=config['model'].get('model_type', 'cnn'),
+        model_name=config['model'].get('model_name', 'resnet18')
     )
     print(f"Model parameters: {model.count_parameters():,}")
     print(f"Model size: {model.get_model_size_mb():.2f} MB")
@@ -205,13 +207,31 @@ def train(
     # Initialize wandb if enabled
     use_wandb = config['logging'].get('use_wandb', False) and WANDB_AVAILABLE
     if use_wandb:
-        # Login to wandb (if API key provided in config, otherwise uses ~/.netrc)
-        api_key = config['logging'].get('wandb_api_key')
+        # Get wandb configuration (prioritize environment variables over config file)
+        # This allows switching accounts without modifying code/config
+        api_key = os.environ.get('WANDB_API_KEY') or config['logging'].get('wandb_api_key')
+        entity = os.environ.get('WANDB_ENTITY') or config['logging'].get('wandb_entity')
+        project = os.environ.get('WANDB_PROJECT') or config['logging'].get('wandb_project', 'qr-phishing-detection')
+        
+        # Login to wandb (if API key provided, otherwise uses existing login from ~/.netrc)
         if api_key:
             wandb.login(key=api_key)
+        
+        # Display which account/entity is being used
+        if entity:
+            print(f"Using wandb entity: {entity}")
+        else:
+            # Try to get current logged-in user
+            try:
+                api = wandb.Api()
+                current_user = api.viewer.username if hasattr(api.viewer, 'username') else 'default'
+                print(f"Using wandb account: {current_user} (default entity)")
+            except:
+                print("Using wandb default account")
+        
         wandb.init(
-            project=config['logging'].get('wandb_project', 'qr-phishing-detection'),
-            entity=config['logging'].get('wandb_entity', None),
+            project=project,
+            entity=entity,
             config={
                 'batch_size': config['training']['batch_size'],
                 'epochs': num_epochs,
@@ -248,7 +268,8 @@ def train(
         
         # Train
         train_loss, train_acc = train_epoch(
-            model, train_loader, criterion, optimizer, device
+            model, train_loader, criterion, optimizer, device,
+            gradient_clip=config['training'].get('gradient_clip', None)
         )
         
         # Validate
