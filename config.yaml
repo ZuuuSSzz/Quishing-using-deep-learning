@@ -2,13 +2,14 @@
 
 data:
   # Paths to data directories
-  benign_dir: "data/QR_All_benign/QR_All_benign/qrs"
-  malicious_dir: "data/QR_All_benign/QR_All_Malicious/qrs"
+  benign_dir: "Data/QR_All_benign/QR_All_benign/qrs"
+  malicious_dir: "Data/QR_All_benign/QR_All_Malicious/qrs"
   
-  # Option A: Sampling strategy (recommended for CPU)
-  sample_size: 20000  # Number of images to sample per class (increased from 5000 for better learning)
+  # Option A: Sampling strategy
+  sample_size: 100000  # Number of images to sample per class (50K per class = 100K total)
   # Available: ~430K benign, ~576K malicious
-  # Using 20K per class = 40K total (still manageable on CPU, ~4-6 hours training)
+  # Using 50K per class = 100K total (GPU: ~2-3 hours estimated)
+  # Training set: ~70K, Val: ~15K, Test: ~15K
   
   # Data split ratios
   train_ratio: 0.7
@@ -23,37 +24,57 @@ data:
 
 training:
   # Training hyperparameters
-  batch_size: 32  # Adjust based on memory (16, 32, or 64)
-  epochs: 10  # Number of training epochs
-  learning_rate: 0.0001  # Initial learning rate (further reduced for stability)
+  batch_size: 64  # Reduced to prevent GPU OOM (64 is safer for most GPUs)
+  # Can increase to 128 if you have 12GB+ GPU memory, but 64 is safer
+  epochs: 10  # Number of training epochs (with early stopping, will stop when optimal)
+  learning_rate: 0.00001  # Standard LR for batch size 64
   
   # Optimizer settings (AdamW)
   optimizer: "adamw"  # adamw or adam
-  weight_decay: 0.001  # L2 regularization (reduced from 0.01)
+  weight_decay: 0.0005  # L2 regularization (reduced for better generalization)
   
   # Learning rate scheduler
   scheduler: "reduce_on_plateau"  # reduce_on_plateau or step
-  scheduler_patience: 5  # For reduce_on_plateau (increased from 3)
+  scheduler_patience: 3  # For reduce_on_plateau (reduced for faster adaptation)
   scheduler_factor: 0.5  # Factor to reduce LR
+  scheduler_min_lr: 1e-6  # Minimum learning rate
+  
+  # Learning rate warmup
+  use_warmup: true  # Enable learning rate warmup
+  warmup_epochs: 3  # Number of epochs for warmup
+  
+  # Early stopping
+  early_stopping: true  # Enable early stopping
+  early_stopping_patience: 5  # Patience for early stopping
+  early_stopping_min_delta: 0.0001  # Minimum change to qualify as improvement
   
   # Gradient clipping (prevents exploding gradients)
   gradient_clip: 1.0  # Clip gradients at this value
   
-  # DataLoader settings
-  num_workers: 4  # Number of worker processes (match CPU cores)
-  pin_memory: false  # Set to true if using GPU
+  # Label smoothing (for better generalization)
+  label_smoothing: 0.1  # Label smoothing factor (0.0 = no smoothing)
+  
+  # DataLoader settings (optimized for GPU)
+  num_workers: 4  # Reduced for stability (can increase to 6-8 if you have more CPU cores)
+  pin_memory: true  # Set to true for GPU (faster data transfer to GPU)
   
   # Model saving
   save_dir: "models"
   save_best: true  # Save model with best validation loss
 
 model:
-  # Model architecture (will be defined in model.py)
+  # Model architecture selection
+  model_type: "transfer"  # Options: "cnn" (custom CNN) or "transfer" (pre-trained)
+  model_name: "resnet18"  # Pre-trained model name (if model_type="transfer")
+                          # Options: "resnet18", "resnet34", "resnet50",
+                          #          "efficientnet_b0", "efficientnet_b1",
+                          #          "mobilenet_v3_small", "mobilenet_v3_large"
+  
+  # Model settings
   num_classes: 2  # Benign (0) and Malicious (1)
-  dropout: 0.5  # Dropout probability
+  dropout: 0.3  # Dropout probability (reduced from 0.5 for better learning)
   
   # Model saving
-  model_name: "qr_cnn_model"
   save_path: "best_model.pth"  # Will be saved in save_dir/models/
 
 evaluation:
@@ -68,6 +89,11 @@ logging:
   # Experiment tracking
   use_wandb: true  # Set to true to use Weights & Biases
   wandb_project: "qr-phishing-detection"
-  wandb_entity: null  # Your wandb username (if using)
-  wandb_api_key: null  # Optional: Your API key (or use 'wandb login' command instead)
+  wandb_entity: null  # Your wandb entity/username (or set WANDB_ENTITY env var)
+  # Note: API key should be set via environment variable WANDB_API_KEY or use 'wandb login'
+  # To use a different account, set: export WANDB_API_KEY="your-api-key"
+  # To switch accounts without modifying code:
+  #   1. Use: export WANDB_ENTITY="your-entity" (optional)
+  #   2. Use: export WANDB_API_KEY="your-api-key" (optional, or use 'wandb login')
+  #   3. Or simply: wandb login (switches to that account)
 
