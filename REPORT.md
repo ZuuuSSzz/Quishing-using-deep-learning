@@ -345,6 +345,47 @@ The project evaluated two model architectures: **CNN** and **Transfer Learning (
 - More efficient model (smaller size, fewer parameters)
 - Faster training time
 
+### 4.1.3 Training Curves Visualization
+
+The following plots show the training and validation metrics over epochs for both models, tracked using Weights & Biases.
+
+**Training and Validation Metrics:**
+
+![Training Curves](wandb-image/quishing-1.png)
+
+*Figure 1: Training and validation metrics comparison. Green lines represent Transfer Learning (ResNet18), blue lines represent CNN. The plots show validation loss, validation accuracy, training loss, training accuracy, learning rate, and total training time.*
+
+**Key Observations from Training Curves:**
+- **CNN (Blue)**: Started with higher validation accuracy (~72%) and achieved the best validation accuracy of 80.54%
+- **ResNet18 (Green)**: Started lower (~62%) but improved steadily, reaching 78.34% validation accuracy
+- **Loss Convergence**: Both models show decreasing loss curves, with CNN achieving lower final validation loss (0.42 vs 0.47)
+- **Training Stability**: Both models show stable training with consistent improvement over epochs
+- **Learning Rate**: Both models used a constant learning rate of 0.00001 throughout training
+
+**Best Validation Metrics Comparison:**
+
+![Best Validation Metrics](wandb-image/quishing-2.png)
+
+*Figure 2: Final best validation loss and accuracy comparison. Green bars represent Transfer Learning (ResNet18), blue bars represent CNN. The plots show final best validation loss, final best validation accuracy, epoch progression, and best validation metrics over training steps.*
+
+**Key Observations:**
+- **CNN (Blue)**: Achieved lower final validation loss (0.41) and higher validation accuracy (80%)
+- **ResNet18 (Green)**: Achieved validation loss of 0.46 and validation accuracy of 78%
+- **Training Time**: ResNet18 trained slightly faster (25 min vs 27 min)
+- **Convergence**: Both models completed 10 epochs with consistent improvement in best validation metrics
+
+**GPU System Metrics:**
+
+![GPU System Metrics](wandb-image/quishing-3.png)
+
+*Figure 3: GPU system metrics during training. Green lines represent Transfer Learning (ResNet18), blue lines represent CNN. The plots show GPU fan speed, memory clock speed, streaming multiprocessor clock speed, and power usage over the 25-minute training period.*
+
+**Key Observations:**
+- **GPU Utilization**: Both models utilized GPU resources effectively during training
+- **Power Consumption**: Consistent GPU power usage throughout training (~150-200W)
+- **Clock Speeds**: Stable GPU memory and SM clock speeds during training
+- **Training Duration**: Both models completed training in approximately 25-27 minutes
+
 ### 4.4 Test Set Performance
 
 Both models were evaluated on the held-out test set (30,000 images) to assess final performance and generalization.
