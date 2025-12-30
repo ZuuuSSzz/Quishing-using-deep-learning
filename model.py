@@ -1,11 +1,23 @@
 """
-CNN Model Architecture for QR Code Phishing Detection
+Model Architecture for QR Code Phishing Detection
 Binary Classification: Benign (0) vs Malicious (1)
+
+Supports:
+- Custom CNN architecture
+- Transfer Learning with pre-trained models (ResNet, EfficientNet, etc.)
 """
 
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+
+# Try to import timm for transfer learning
+try:
+    import timm
+    TIMM_AVAILABLE = True
+except ImportError:
+    TIMM_AVAILABLE = False
+    timm = None
 
 
 class QRCodeCNN(nn.Module):
@@ -102,7 +114,13 @@ class QRCodeCNN(nn.Module):
         return total_size
 
 
-def create_model(num_classes: int = 2, dropout: float = 0.5, device: str = 'cpu'):
+def create_model(
+    num_classes: int = 2, 
+    dropout: float = 0.5, 
+    device: str = 'cpu',
+    model_type: str = 'cnn',
+    model_name: str = 'resnet18'
+):
     """
     Create and initialize the model.
     
@@ -110,12 +128,56 @@ def create_model(num_classes: int = 2, dropout: float = 0.5, device: str = 'cpu'
         num_classes: Number of output classes
         dropout: Dropout probability
         device: Device to place model on ('cpu' or 'cuda')
+        model_type: Type of model ('cnn' for custom CNN, 'transfer' for pre-trained)
+        model_name: Name of pre-trained model (if model_type='transfer')
+                    Options: 'resnet18', 'resnet34', 'resnet50', 
+                            'efficientnet_b0', 'efficientnet_b1',
+                            'mobilenet_v3_small', 'mobilenet_v3_large'
         
     Returns:
-        Initialized model
+        Initialized model with count_parameters() and get_model_size_mb() methods
     """
+    if model_type == 'transfer':
+        if not TIMM_AVAILABLE:
+            raise ImportError(
+                "timm library is required for transfer learning. "
+                "Install it with: pip install timm or uv add timm"
+            )
+        
+        # Create pre-trained model
+        print(f"Loading pre-trained model: {model_name}")
+        model = timm.create_model(
+            model_name,
+            pretrained=True,  # Use pre-trained weights
+            num_classes=num_classes,  # Replace final layer for our task
+            drop_rate=dropout  # Apply dropout
+        )
+        
+        # Add helper methods for compatibility with existing code
+        def count_parameters():
+            """Count the total number of trainable parameters."""
+            return sum(p.numel() for p in model.parameters() if p.requires_grad)
+        
+        def get_model_size_mb():
+            """Get the model size in megabytes."""
+            param_size = sum(p.numel() * p.element_size() for p in model.parameters())
+            buffer_size = sum(b.numel() * b.element_size() for b in model.buffers())
+            total_size = (param_size + buffer_size) / (1024 ** 2)  # Convert to MB
+            return total_size
+        
+        # Bind methods to model instance
+        import types
+        model.count_parameters = types.MethodType(lambda self: count_parameters(), model)
+        model.get_model_size_mb = types.MethodType(lambda self: get_model_size_mb(), model)
+        
+        # Freeze early layers (optional - can be configured)
+        # For now, we'll fine-tune all layers, but you can freeze backbone if needed
+        
+        print(f"✓ Loaded pre-trained {model_name} with {num_classes} classes")
+        
+    else:  # model_type == 'cnn'
+        # Use custom CNN
     model = QRCodeCNN(num_classes=num_classes, dropout=dropout)
-    model = model.to(device)
     
     # Initialize weights (Xavier/He initialization with better scaling)
     def init_weights(m):
@@ -132,12 +194,12 @@ def create_model(num_classes: int = 2, dropout: float = 0.5, device: str = 'cpu'
             else:
                 nn.init.xavier_normal_(m.weight)
                 if m.bias is not None:
-                    nn.init.constant_(m.bias, 0)
-        elif isinstance(m, nn.BatchNorm2d):
-            nn.init.constant_(m.weight, 1)
             nn.init.constant_(m.bias, 0)
     
     model.apply(init_weights)
+        print("✓ Created custom CNN model")
+    
+    model = model.to(device)
     
     return model
 
