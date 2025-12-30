@@ -407,4 +407,3 @@ if __name__ == "__main__":
     args = parser.parse_args()
     
     train(config_path=args.config, save_plots=not args.no_plots)
-
