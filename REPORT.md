@@ -347,23 +347,74 @@ The project evaluated two model architectures: **CNN** and **Transfer Learning (
 
 ### 4.4 Test Set Performance
 
-**Note**: Test set evaluation should be run using `python test.py` for both models. Results will be filled after evaluation.
+Both models were evaluated on the held-out test set (30,000 images) to assess final performance and generalization.
 
-**Overall Metrics (To be filled after running test.py):**
-- Test Accuracy: [Run test.py]
-- Test Precision: [Run test.py]
-- Test Recall: [Run test.py]
-- Test F1-Score: [Run test.py]
+#### 4.4.1 CNN Test Set Performance ✅
 
-**Per-Class Performance (To be filled after running test.py):**
-- Benign:
-  - Precision: [Run test.py]
-  - Recall: [Run test.py]
-  - F1-Score: [Run test.py]
-- Malicious:
-  - Precision: [Run test.py]
-  - Recall: [Run test.py]
-  - F1-Score: [Run test.py]
+**Overall Metrics:**
+- **Test Accuracy**: 71.72%
+- **Test Precision**: 71.96%
+- **Test Recall**: 71.72%
+- **Test F1-Score**: 71.65%
+- **Test Loss**: 0.5575
+
+**Per-Class Performance:**
+- **Benign**:
+  - Precision: 69.64%
+  - Recall: 76.82%
+  - F1-Score: 73.05%
+- **Malicious**:
+  - Precision: 74.28%
+  - Recall: 66.65%
+  - F1-Score: 70.26%
+
+**Key Observations:**
+- **Validation-Test Gap**: 8.82% drop (80.54% validation → 71.72% test) - indicates some overfitting
+- **Benign Class**: Higher recall (76.82%) - good at identifying benign QR codes
+- **Malicious Class**: Higher precision (74.28%) - when predicting malicious, it's usually correct
+- **Test Loss**: 0.5575 (higher than validation loss 0.4169) - confirms overfitting
+
+#### 4.4.2 Transfer Learning (ResNet18) Test Set Performance ✅
+
+**Overall Metrics:**
+- **Test Accuracy**: 77.82%
+- **Test Precision**: 78.82%
+- **Test Recall**: 77.82%
+- **Test F1-Score**: 77.63%
+- **Test Loss**: 0.4699
+
+**Per-Class Performance:**
+- **Benign**:
+  - Precision: 73.42%
+  - Recall: 87.06%
+  - F1-Score: 79.66%
+- **Malicious**:
+  - Precision: 84.19%
+  - Recall: 68.61%
+  - F1-Score: 75.61%
+
+**Key Observations:**
+- **Validation-Test Gap**: 0.52% drop (78.34% validation → 77.82% test) - excellent generalization
+- **Benign Class**: Very high recall (87.06%) - excellent at identifying benign QR codes
+- **Malicious Class**: High precision (84.19%) - very reliable when predicting malicious
+- **Test Loss**: 0.4699 (close to validation loss 0.4661) - confirms good generalization
+
+#### 4.4.3 Test Set Comparison
+
+| Metric | CNN | ResNet18 | Winner |
+|--------|-----|----------|--------|
+| **Test Accuracy** | 71.72% | **77.82%** | ✅ **ResNet18** (+6.1%) |
+| **Test Precision** | 71.96% | **78.82%** | ✅ **ResNet18** (+6.86%) |
+| **Test Recall** | 71.72% | **77.82%** | ✅ **ResNet18** (+6.1%) |
+| **Test F1-Score** | 71.65% | **77.63%** | ✅ **ResNet18** (+5.98%) |
+| **Test Loss** | 0.5575 | **0.4699** | ✅ **ResNet18** (lower) |
+| **Val-Test Gap** | 8.82% | **0.52%** | ✅ **ResNet18** (better generalization) |
+
+**Critical Finding:**
+- **ResNet18 significantly outperforms CNN on test set** (+6.1% accuracy)
+- **ResNet18 shows much better generalization** - validation-test gap is only 0.52% vs 8.82% for CNN
+- **CNN overfits more** - large drop from validation (80.54%) to test (71.72%)
+- **ResNet18 is more reliable** - test performance closely matches validation performance
 
 ### 4.2 Efficiency Metrics
 
@@ -380,37 +431,49 @@ The project evaluated two model architectures: **CNN** and **Transfer Learning (
 - **Training Time**: 27.44 minutes (for 10 epochs on 200K images)
 
 **Performance Analysis:**
-- Very fast inference: 0.24 ms per sample (can process ~4,255 samples/second) - **faster than ResNet18**
+- Fast inference: 0.24 ms per sample (can process ~4,255 samples/second)
 - Same computational cost as ResNet18: 0.56 GFLOPs per inference
-- Higher memory usage: ~809 MB total during inference (vs 194 MB for ResNet18)
-- Faster throughput than ResNet18 (4,255 vs 3,244 samples/sec)
+- Higher memory usage: ~809 MB total during inference (vs 194 MB for ResNet18) - **4.2x larger**
+- Lower throughput than ResNet18 (4,255 vs 4,795 samples/sec)
 
-#### 4.2.2 Transfer Learning (ResNet18) Efficiency Metrics
+#### 4.2.2 Transfer Learning (ResNet18) Efficiency Metrics ✅
 
-- Inference Time: [Run test.py to get actual values] ms/sample
-- Throughput: [Run test.py to get actual values] samples/sec
-- Model Size: 42.68 MB
-- Parameters: 11,177,538 (~11.2M)
-- FLOPs: [Run test.py to get actual values] GFLOPs
-- Memory Usage: [Run test.py to get actual values] MB (model + runtime)
-- Training Time: 25.15 minutes (for 10 epochs on 200K images)
+- **Inference Time**: 0.21 ms/sample (±0.03 ms)
+- **Throughput**: 4,795.42 samples/sec
+- **Model Size**: 42.68 MB
+- **Parameters**: 11,177,538 (~11.2M)
+- **FLOPs**: 0.56 GFLOPs (558.7M FLOPs)
+- **Memory Usage**: 193.60 MB (total: model + runtime)
+  - Model Memory: 42.68 MB
+  - Runtime Memory: 9.70 MB (peak)
+- **Training Time**: 25.15 minutes (for 10 epochs on 200K images)
 
-**Note**: Run `python test.py` to get complete efficiency metrics including FLOPs and memory usage for both models.
+**Performance Analysis:**
+- Very fast inference: 0.21 ms per sample (can process ~4,795 samples/second) - **faster than CNN**
+- Same computational cost as CNN: 0.56 GFLOPs per inference
+- Much lower memory usage: ~194 MB total during inference (vs 809 MB for CNN) - **4.2x more efficient**
+- Higher throughput than CNN (4,795 vs 4,255 samples/sec) - **12.7% faster**
 
 ### 4.3 Model Comparison: CNN vs Transfer Learning (ResNet18)
 
 | Metric | CNN | Transfer Learning (ResNet18) | Winner |
 |--------|-----|------------------------------|--------|
 | **Validation Accuracy** | **80.54%** | 78.34% | ✅ **CNN** (+2.2%) |
+| **Test Accuracy** | 71.72% | **77.82%** | ✅ **ResNet18** (+6.1%) |
 | **Validation Loss** | **0.4169** | 0.4661 | ✅ **CNN** (lower) |
+| **Test Loss** | 0.5575 | **0.4699** | ✅ **ResNet18** (lower) |
 | **Training Accuracy** | **78.80%** | 75.99% | ✅ **CNN** (+2.81%) |
 | **Training Loss** | **0.4459** | 0.5022 | ✅ **CNN** (lower) |
+| **Val-Test Gap** | 8.82% | **0.52%** | ✅ **ResNet18** (better generalization) |
 | **Training Time** | 27.44 min | **25.15 min** | ✅ **ResNet18** (faster) |
 | **Model Size** | 196.86 MB | **42.68 MB** | ✅ **ResNet18** (4.6x smaller) |
 | **Parameters** | 51.6M | **11.2M** | ✅ **ResNet18** (4.6x fewer) |
+| **Inference Time** | **0.24 ms** | 0.21 ms | ✅ **ResNet18** (faster) |
+| **Throughput** | 4,255 samples/sec | **4,795 samples/sec** | ✅ **ResNet18** (12.7% faster) |
+| **Memory Usage** | 809.40 MB | **193.60 MB** | ✅ **ResNet18** (4.2x smaller) |
+| **FLOPs** | 0.56 GFLOPs | 0.56 GFLOPs | ✅ Tie |
 | **Epoch 1 Accuracy** | **72.36%** | 61.36% | ✅ **CNN** (better start) |
 | **Convergence Speed** | Fast | Fast | ✅ Tie |
-| **Generalization** | **Excellent** (1.7% gap) | Good (2.3% gap) | ✅ **CNN** |
 
 **Key Findings:**
 
@@ -425,18 +488,19 @@ The project evaluated two model architectures: **CNN** and **Transfer Learning (
 6. **CNN shows larger validation-test gap** - 80.54% validation vs 71.72% test (8.8% drop)
 
 **Efficiency:**
-7. **CNN has faster inference** - 0.24 ms vs 0.31 ms per sample
-8. **CNN has higher throughput** - 4,255 vs 3,244 samples/sec
+7. **ResNet18 has faster inference** - 0.21 ms vs 0.24 ms per sample (12.5% faster)
+8. **ResNet18 has higher throughput** - 4,795 vs 4,255 samples/sec (12.7% faster)
 9. **ResNet18 is more memory efficient** - 194 MB vs 809 MB (4.2x smaller)
 10. **ResNet18 is more efficient overall** - 4.6x smaller model size and fewer parameters
 11. **ResNet18 trains slightly faster** - 25.15 min vs 27.44 min
+12. **Same computational cost** - Both models use 0.56 GFLOPs per inference
 
 **Conclusion**: 
 - **For Best Test Accuracy**: Use ResNet18 (77.82% test accuracy) - better generalization
-- **For Fastest Inference**: Use CNN (0.24 ms/sample, 4,255 samples/sec)
-- **For Memory Efficiency**: Use ResNet18 (194 MB vs 809 MB)
-- **Trade-off**: CNN has faster inference but larger memory footprint and lower test accuracy
-- **Recommendation**: ResNet18 is better for production (better test performance, more efficient)
+- **For Fastest Inference**: Use ResNet18 (0.21 ms/sample, 4,795 samples/sec) - 12.5% faster than CNN
+- **For Memory Efficiency**: Use ResNet18 (194 MB vs 809 MB) - 4.2x more efficient
+- **Overall Winner**: ResNet18 outperforms CNN in all aspects (accuracy, speed, efficiency)
+- **Recommendation**: ResNet18 is clearly better for production (better test performance, faster inference, more efficient)
 
 ### 4.5 Confusion Matrix
 
@@ -459,10 +523,34 @@ Actual Benign  11,500   3,468
 
 **Key Insights:**
 - Model has higher recall for Benign class (76.82%) - good at catching benign QR codes
-- Lower recall for Malicious class (66.65%) - misses some malicious QR codes (similar to ResNet18)
+- Lower recall for Malicious class (66.65%) - misses some malicious QR codes
 - Higher precision for Malicious (74.28%) - when it says malicious, it's usually right
 - The model is more conservative in predicting malicious (fewer false positives, more false negatives)
 - More false negatives for malicious class compared to ResNet18 (5,011 vs 4,714)
+
+**ResNet18 Confusion Matrix:** ✅
+
+Based on test set evaluation (30,000 samples):
+
+```
+                Predicted
+              Benign  Malicious
+Actual Benign  13,030   1,938
+      Malicious  4,714  10,318
+```
+
+**Analysis:**
+- **True Positives (Benign)**: 13,030 - Correctly identified benign QR codes
+- **False Positives (Benign)**: 1,938 - Benign QR codes misclassified as malicious
+- **False Negatives (Malicious)**: 4,714 - Malicious QR codes misclassified as benign
+- **True Positives (Malicious)**: 10,318 - Correctly identified malicious QR codes
+
+**Key Insights:**
+- **Excellent recall for Benign class (87.06%)** - very good at catching benign QR codes
+- **High precision for Malicious (84.19%)** - very reliable when predicting malicious
+- **Better balance** - fewer false negatives for malicious (4,714) compared to CNN (5,011)
+- **Fewer false positives** - only 1,938 benign QR codes misclassified vs 3,468 for CNN
+- **Overall better performance** - more correct predictions in both classes
 
 
 ## 5. Challenges and Solutions
@@ -585,7 +673,7 @@ This project successfully implements a deep learning pipeline for QR code phishi
 - **Model**: ResNet18 (11.2M parameters, 42.7 MB)
 - **Best Validation Loss**: 0.4661
 - **Test Loss**: 0.4699 ✅
-- **Inference Speed**: 0.31 ms/sample, 3,244 samples/sec ✅
+- **Inference Speed**: 0.21 ms/sample, 4,795 samples/sec ✅
 - **FLOPs**: 0.56 GFLOPs ✅
 - **Memory Usage**: 193.60 MB ✅
 
@@ -593,10 +681,11 @@ This project successfully implements a deep learning pipeline for QR code phishi
 
 **Winner**: 
 - **Test Accuracy**: ResNet18 performs better (77.82% vs 71.72%) - **+6.1% improvement**
-- **Generalization**: ResNet18 shows better generalization (smaller validation-test gap)
-- **Inference Speed**: CNN is faster (0.24 ms vs 0.31 ms per sample)
-- **Memory Efficiency**: ResNet18 is much more efficient (194 MB vs 809 MB)
-- **Overall Recommendation**: ResNet18 is better for production (better test performance, more efficient)
+- **Generalization**: ResNet18 shows better generalization (0.52% vs 8.82% validation-test gap)
+- **Inference Speed**: ResNet18 is faster (0.21 ms vs 0.24 ms per sample) - **12.5% faster**
+- **Throughput**: ResNet18 is faster (4,795 vs 4,255 samples/sec) - **12.7% faster**
+- **Memory Efficiency**: ResNet18 is much more efficient (194 MB vs 809 MB) - **4.2x smaller**
+- **Overall Recommendation**: **ResNet18 is clearly superior** - better test performance, faster inference, and more efficient
 
 **Recommendations:**
 - ✅ **Transfer Learning**: Already implemented and showing good results
