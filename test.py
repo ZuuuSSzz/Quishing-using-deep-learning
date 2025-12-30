@@ -17,6 +17,11 @@ from sklearn.metrics import (
     accuracy_score, precision_score, recall_score, f1_score,
     confusion_matrix, classification_report
 )
+try:
+    import psutil
+    PSUTIL_AVAILABLE = True
+except ImportError:
+    PSUTIL_AVAILABLE = False
 
 from data_utils import create_data_splits, create_dataloaders
 from model import create_model
@@ -106,6 +111,146 @@ def evaluate_model(
     }
     
     return results
+
+
+def calculate_flops(model, input_size=(1, 3, 224, 224)):
+    """
+    Calculate FLOPs (Floating Point Operations) for the model.
+    
+    Args:
+        model: The model to analyze
+        input_size: Input tensor size (batch, channels, height, width)
+        
+    Returns:
+        Total FLOPs count
+    """
+    model.eval()
+    
+    # Create dummy input
+    dummy_input = torch.randn(input_size)
+    
+    flops = 0
+    
+    # Manual calculation based on architecture
+    # Conv1: 3 -> 32, kernel 3x3, padding=1
+    # Input: 224x224, Output: 224x224 (due to padding)
+    # FLOPs = kernel_size^2 * in_channels * out_channels * output_height * output_width
+    # After pooling: 112x112
+    conv1_flops = 3 * 3 * 3 * 32 * 224 * 224  # Conv
+    pool1_flops = 32 * 112 * 112  # MaxPool (comparisons)
+    flops += conv1_flops + pool1_flops
+    
+    # Conv2: 32 -> 64, kernel 3x3, padding=1
+    # Input: 112x112, Output: 112x112, After pooling: 56x56
+    conv2_flops = 3 * 3 * 32 * 64 * 112 * 112
+    pool2_flops = 64 * 56 * 56
+    flops += conv2_flops + pool2_flops
+    
+    # Conv3: 64 -> 128, kernel 3x3, padding=1
+    # Input: 56x56, Output: 56x56, After pooling: 28x28
+    conv3_flops = 3 * 3 * 64 * 128 * 56 * 56
+    pool3_flops = 128 * 28 * 28
+    flops += conv3_flops + pool3_flops
+    
+    # FC1: 100352 -> 512
+    # FLOPs = input_size * output_size (multiply-add operations)
+    fc1_flops = 100352 * 512
+    flops += fc1_flops
+    
+    # FC2: 512 -> 256
+    fc2_flops = 512 * 256
+    flops += fc2_flops
+    
+    # FC3: 256 -> 2
+    fc3_flops = 256 * 2
+    flops += fc3_flops
+    
+    # ReLU operations (negligible, but counted)
+    # Approximate: number of activations
+    relu_flops = 32 * 112 * 112 + 64 * 56 * 56 + 128 * 28 * 28 + 512 + 256
+    flops += relu_flops
+    
+    return flops
+
+
+def measure_memory_usage(model, device, input_size=(1, 3, 224, 224)):
+    """
+    Measure memory usage of the model during inference.
+    
+    Args:
+        model: The model to measure
+        device: Device (cpu or cuda)
+        input_size: Input tensor size
+        
+    Returns:
+        Dictionary with memory usage metrics
+    """
+    model.eval()
+    
+    # Clear cache if CUDA
+    if device.type == 'cuda':
+        torch.cuda.empty_cache()
+        torch.cuda.reset_peak_memory_stats()
+    
+    # Measure model size (parameters + buffers)
+    param_size = sum(p.numel() * p.element_size() for p in model.parameters())
+    buffer_size = sum(b.numel() * b.element_size() for b in model.buffers())
+    model_memory = param_size + buffer_size
+    
+    # Measure runtime memory during forward pass
+    dummy_input = torch.randn(input_size).to(device)
+    
+    if device.type == 'cuda':
+        # GPU memory
+        torch.cuda.synchronize()
+        memory_before = torch.cuda.memory_allocated(device)
+        
+        with torch.no_grad():
+            _ = model(dummy_input)
+        
+        torch.cuda.synchronize()
+        memory_after = torch.cuda.memory_allocated(device)
+        peak_memory = torch.cuda.max_memory_allocated(device)
+        
+        runtime_memory = memory_after - memory_before
+        peak_runtime_memory = peak_memory - memory_before
+        
+        return {
+            'model_memory_mb': model_memory / (1024 ** 2),
+            'runtime_memory_mb': runtime_memory / (1024 ** 2),
+            'peak_memory_mb': peak_runtime_memory / (1024 ** 2),
+            'total_memory_mb': peak_memory / (1024 ** 2),
+            'device': 'cuda'
+        }
+    else:
+        # CPU memory using psutil
+        if PSUTIL_AVAILABLE:
+            process = psutil.Process(os.getpid())
+            memory_before = process.memory_info().rss / (1024 ** 2)  # MB
+            
+            with torch.no_grad():
+                _ = model(dummy_input)
+            
+            memory_after = process.memory_info().rss / (1024 ** 2)  # MB
+            runtime_memory = memory_after - memory_before
+            
+            return {
+                'model_memory_mb': model_memory / (1024 ** 2),
+                'runtime_memory_mb': runtime_memory,
+                'peak_memory_mb': runtime_memory,
+                'total_memory_mb': memory_after,
+                'device': 'cpu'
+            }
+        else:
+            # Fallback: only model memory
+            return {
+                'model_memory_mb': model_memory / (1024 ** 2),
+                'runtime_memory_mb': None,
+                'peak_memory_mb': None,
+                'total_memory_mb': model_memory / (1024 ** 2),
+                'device': 'cpu',
+                'note': 'psutil not available, only model memory measured'
+            }
 
 
 def measure_inference_time(model, test_loader, device, num_batches=10):
@@ -278,7 +423,9 @@ def evaluate(
     model = create_model(
         num_classes=config['model']['num_classes'],
         dropout=config['model']['dropout'],
-        device=device
+        device=device,
+        model_type=config['model'].get('model_type', 'cnn'),
+        model_name=config['model'].get('model_name', 'resnet18')
     )
     
     # Load saved model
@@ -309,12 +456,36 @@ def evaluate(
     class_names = ['Benign', 'Malicious']
     print_metrics(results, class_names)
     
-    # Measure inference time
+    # Measure efficiency metrics
     if config['evaluation']['measure_inference_time']:
         print("\n" + "=" * 60)
         print("EFFICIENCY METRICS")
         print("=" * 60)
         
+        # Measure FLOPS
+        print("\nCalculating FLOPs...")
+        flops = calculate_flops(model, input_size=(1, 3, config['data']['image_size'], config['data']['image_size']))
+        flops_giga = flops / 1e9
+        print(f"  FLOPs: {flops:,} ({flops_giga:.2f} GFLOPs)")
+        results['flops'] = flops
+        results['flops_giga'] = flops_giga
+        
+        # Measure memory usage
+        print("\nMeasuring memory usage...")
+        memory_results = measure_memory_usage(
+            model, device, 
+            input_size=(1, 3, config['data']['image_size'], config['data']['image_size'])
+        )
+        print(f"  Model Memory: {memory_results['model_memory_mb']:.2f} MB")
+        if memory_results['runtime_memory_mb'] is not None:
+            print(f"  Runtime Memory: {memory_results['runtime_memory_mb']:.2f} MB")
+            print(f"  Peak Memory: {memory_results['peak_memory_mb']:.2f} MB")
+        print(f"  Total Memory: {memory_results['total_memory_mb']:.2f} MB")
+        if 'note' in memory_results:
+            print(f"  Note: {memory_results['note']}")
+        results['memory_usage'] = memory_results
+        
+        # Measure inference time
         print("\nMeasuring inference time...")
         timing_results = measure_inference_time(
             model, test_loader, device, num_batches=20
@@ -355,6 +526,10 @@ def evaluate(
     print(f"Test F1-Score: {results['f1']*100:.2f}%")
     print(f"Model Parameters: {num_params:,}")
     print(f"Model Size: {model_size_mb:.2f} MB")
+    if 'flops' in results:
+        print(f"FLOPs: {results['flops_giga']:.2f} GFLOPs")
+    if 'memory_usage' in results:
+        print(f"Memory Usage: {results['memory_usage']['total_memory_mb']:.2f} MB")
     if 'inference_time' in results:
         print(f"Inference Time: {results['inference_time']['avg_sample_time_ms']:.2f} ms/sample")
     print("=" * 60)
